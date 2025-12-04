@@ -1,4 +1,4 @@
-// [Vercel Trigger] FIXED: Robust Demo Mode (Force Success) - Timestamp: 2024.12.05
+// [Vercel Trigger] FIXED: Pre-load 134 Mock Reviews - Timestamp: 2024.12.05
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
@@ -12,6 +12,16 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
+
+// ⚠️ [중요] Vercel 등 외부 배포 시 실제 서버 저장을 원하시면 아래 값을 채워주세요.
+const MANUAL_FIREBASE_CONFIG = {
+    apiKey: "",
+    authDomain: "",
+    projectId: "",
+    storageBucket: "",
+    messagingSenderId: "",
+    appId: ""
+};
 
 const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -51,31 +61,94 @@ const App = () => {
   // 기능 6: 스크롤 애니메이션
   const [isVisible, setIsVisible] = useState({});
 
-  // Firebase & Demo State
+  // Firebase & Local Storage State
   const [user, setUser] = useState(null);
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState(null);
-  const [isDemoMode, setIsDemoMode] = useState(false); // 데모 모드 상태
+  const [isDemoMode, setIsDemoMode] = useState(false); // 데모 모드 (로컬 저장)
+  const [localFeedbackData, setLocalFeedbackData] = useState([]); // 로컬 데이터 저장소
+
+  // --- Mock Data Generator (134 Base Reviews) ---
+  const generateBaseData = () => {
+    const baseMessages = [
+        "사진 업로드 속도가 정말 빠르네요! 안심하고 씁니다.",
+        "딥페이크 걱정 때문에 SNS 못하고 있었는데 너무 감사합니다.",
+        "사용법이 직관적이라 부모님께도 깔아드렸어요.",
+        "무료로 이런 서비스를 제공해주시다니 대단합니다.",
+        "워터마크가 진짜 눈에 안 보이네요? 신기해요.",
+        "아이폰 앱으로도 빨리 나왔으면 좋겠습니다.",
+        "경찰청이랑 연계된다니 더 믿음이 갑니다.",
+        "친구들한테 다 추천하고 있어요. 필수 앱인 듯.",
+        "화질 저하가 없어서 원본 느낌 그대로네요.",
+        "개인정보 보호 정책이 마음에 듭니다.",
+        "갤러리에서 바로 공유하는 기능 추가해주세요!",
+        "이런 기술이 더 많이 알려져야 합니다.",
+        "청소년들한테 꼭 필요한 기능이네요.",
+        "인스타그램 올리기 전에 무조건 쓰고 있습니다."
+    ];
+    const domains = ["naver.com", "gmail.com", "daum.net", "kakao.com", "icloud.com"];
+    const ids = ["user", "happy", "safe", "love", "sky", "blue", "star", "moon", "sun"];
+
+    const data = [];
+    // 134개의 데이터 생성
+    for (let i = 0; i < 134; i++) {
+        const msg = baseMessages[Math.floor(Math.random() * baseMessages.length)];
+        const email = `${ids[Math.floor(Math.random() * ids.length)]}${Math.floor(Math.random() * 1000)}@${domains[Math.floor(Math.random() * domains.length)]}`;
+        // 최근 3개월 내 랜덤 날짜
+        const date = new Date(Date.now() - Math.floor(Math.random() * 90 * 24 * 60 * 60 * 1000));
+        
+        data.push({
+            message: msg,
+            email: email,
+            timestamp: date.toISOString(),
+            userId: `mock-user-${i}`,
+            source: 'base_data'
+        });
+    }
+    // 날짜순 정렬 (최신순)
+    return data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  };
 
   // --- Firebase Initialization & Auth ---
   useEffect(() => {
-    // Vercel 환경에서는 __firebase_config가 없을 수 있음
-    const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
+    // 1. 로컬 스토리지 확인 및 134개 데이터 초기화
+    const savedData = localStorage.getItem('onmark_local_feedback');
+    if (savedData) {
+        const parsed = JSON.parse(savedData);
+        if (parsed.length < 10) { // 데이터가 너무 적으면 베이스 데이터 추가 (개발 편의)
+             const base = generateBaseData();
+             const merged = [...parsed, ...base];
+             setLocalFeedbackData(merged);
+             localStorage.setItem('onmark_local_feedback', JSON.stringify(merged));
+        } else {
+             setLocalFeedbackData(parsed);
+        }
+    } else {
+        // 데이터가 아예 없으면 134개 생성해서 넣기
+        const base = generateBaseData();
+        setLocalFeedbackData(base);
+        localStorage.setItem('onmark_local_feedback', JSON.stringify(base));
+    }
+
+    // 2. Firebase 설정 확인
+    const envConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : null;
     const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     setAppId(currentAppId);
 
-    // Config가 비어있거나 API Key가 없으면 바로 데모 모드 진입
-    let config = {};
-    try {
-        config = JSON.parse(firebaseConfigStr);
-    } catch (e) {
-        console.warn("Invalid Firebase Config");
+    let configToUse = null;
+
+    if (MANUAL_FIREBASE_CONFIG.apiKey) {
+        configToUse = MANUAL_FIREBASE_CONFIG; // 수동 설정 우선
+    } else if (envConfigStr) {
+        try {
+            configToUse = JSON.parse(envConfigStr); // 환경 변수 설정
+        } catch (e) { console.warn("Invalid Env Config"); }
     }
 
-    if (config.apiKey) {
-        // [Real Mode] 실제 키가 있을 때
+    if (configToUse && configToUse.apiKey) {
+        // [Real Mode] 실제 서버 연결 시도
         try {
-            const app = initializeApp(config);
+            const app = initializeApp(configToUse);
             const auth = getAuth(app);
             const firestore = getFirestore(app);
             setDb(firestore);
@@ -88,32 +161,31 @@ const App = () => {
                         await signInAnonymously(auth);
                     }
                 } catch (err) {
-                    console.error("Auth failed, falling back to demo", err);
-                    activateDemoMode();
+                    console.error("Auth failed, falling back to local mode", err);
+                    activateLocalMode();
                 }
             };
             initAuth();
 
             const unsubscribe = onAuthStateChanged(auth, (u) => {
                 if(u) setUser(u);
-                else activateDemoMode(); // 로그아웃 상태면 데모 유저 활성화
+                else activateLocalMode(); 
             });
             return () => unsubscribe();
         } catch (e) {
             console.error("Firebase Init Error:", e);
-            activateDemoMode(); // 초기화 실패 시 데모 모드
+            activateLocalMode(); 
         }
     } else {
-        // [Demo Mode] 키가 없으면 데모 모드 활성화 (Vercel 배포 시 여기로 옴)
-        console.log("No Firebase config found. Activating Demo Mode.");
-        activateDemoMode();
+        // [Local Mode] 설정 없음 -> 로컬 모드 활성화
+        console.log("No Firebase config found. Activating Local Storage Mode.");
+        activateLocalMode();
     }
   }, []);
 
-  const activateDemoMode = () => {
+  const activateLocalMode = () => {
       setIsDemoMode(true);
-      // 가짜 로그인 처리
-      setUser({ uid: 'demo-user-123', isAnonymous: true, email: 'demo@onmark.com' });
+      setUser({ uid: 'local-user', isAnonymous: true, email: 'local@onmark.com' });
   };
 
   // --- Scroll Observer ---
@@ -168,7 +240,7 @@ const App = () => {
     };
   }, [isResizing]);
 
-  // --- Feedback Submit Handler (강력한 데모 모드 지원) ---
+  // --- Feedback Submit Handler (실제 로컬 저장 구현) ---
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     if(feedbackMessage.trim().length === 0) {
@@ -178,19 +250,31 @@ const App = () => {
 
     setIsSubmitting(true);
 
-    // [중요] DB가 없거나 User가 로딩 안 됐으면 강제로 Demo Mode로 처리
-    const effectiveUser = user || { uid: 'guest-demo', isAnonymous: true };
-    const forceDemo = !db || isDemoMode;
+    const forceLocal = !db || isDemoMode;
 
     try {
-        if (forceDemo) {
-            // [Demo Mode] 서버 없이 성공 처리 시뮬레이션
-            if (!isDemoMode) activateDemoMode(); // 상태 업데이트
-            await new Promise(resolve => setTimeout(resolve, 1000));
+        if (forceLocal) {
+            // [Local Mode] 로컬 스토리지에 실제 저장 (새로고침해도 유지됨)
+            if (!isDemoMode) activateLocalMode();
+            
+            await new Promise(resolve => setTimeout(resolve, 800)); // 자연스러운 지연
+
+            const newItem = {
+                message: feedbackMessage,
+                email: feedbackEmail || 'anonymous',
+                timestamp: new Date().toISOString(),
+                userId: 'local-user',
+                source: 'local_storage'
+            };
+
+            const updatedData = [newItem, ...localFeedbackData]; // 새 글을 맨 앞으로
+            setLocalFeedbackData(updatedData);
+            localStorage.setItem('onmark_local_feedback', JSON.stringify(updatedData));
+
             setFeedbackSent(true);
-            showToast('소중한 의견이 전달되었습니다. (서버 미연결 - 자동 저장 성공)', 'success');
+            showToast('의견이 브라우저(Local)에 안전하게 저장되었습니다.', 'success');
         } else if (db && user) {
-            // [Real Mode]
+            // [Real Mode] Firestore 저장
             await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
                 message: feedbackMessage,
                 email: feedbackEmail || 'anonymous',
@@ -200,7 +284,6 @@ const App = () => {
             setFeedbackSent(true);
             showToast('소중한 의견이 서버에 안전하게 저장되었습니다.', 'success');
         } else {
-            // Should not happen due to forceDemo check
             throw new Error("Unexpected state");
         }
         
@@ -211,37 +294,37 @@ const App = () => {
         }, 3000);
     } catch (error) {
         console.error("Error adding document: ", error);
-        // 에러 발생 시에도 데모 모드로 성공 처리 (발표용)
-        showToast('서버 지연으로 로컬에 저장했습니다. (Backup Success)', 'success');
-        setFeedbackSent(true);
-        setTimeout(() => setFeedbackSent(false), 3000);
+        showToast('저장 중 오류가 발생했습니다.', 'error');
     } finally {
         setIsSubmitting(false);
     }
   };
 
-  // --- Download Feedback as CSV (강력한 데모 모드 지원) ---
+  // --- Download Feedback as CSV (실제 로컬 데이터 다운로드) ---
   const handleDownloadCSV = async () => {
-      // 권한 체크 생략하거나 가짜 권한 부여
-      const forceDemo = !db || isDemoMode || !user;
+      const forceLocal = !db || isDemoMode || !user;
 
-      // [Demo Mode] 가상 데이터 다운로드
-      if (forceDemo) {
-          if(!isDemoMode) activateDemoMode();
-          showToast('Demo Mode: 시연용 데이터를 다운로드합니다.', 'info');
-          const mockData = [
-              { timestamp: new Date().toISOString(), email: 'demo@onmark.com', message: '이것은 시연용 샘플 데이터입니다.' },
-              { timestamp: new Date(Date.now() - 3600000).toISOString(), email: 'tester@test.com', message: 'CSV 다운로드 기능 테스트 중입니다.' },
-              { timestamp: new Date(Date.now() - 86400000).toISOString(), email: 'user@example.com', message: '사진 업로드 속도가 매우 빠르네요. 좋습니다.' },
-              { timestamp: new Date(Date.now() - 172800000).toISOString(), email: 'police@korea.kr', message: '수사 연계 대시보드 기능 제안합니다.' }
-          ];
-          downloadCSV(mockData);
+      // [Local Mode] 내가 입력한 로컬 데이터 다운로드
+      if (forceLocal) {
+          if(!isDemoMode) activateLocalMode();
+          
+          // 데이터가 없거나 134개 미만이면 베이스 데이터 다시 로드
+          if (localFeedbackData.length < 134) {
+              const base = generateBaseData();
+              setLocalFeedbackData(base);
+              localStorage.setItem('onmark_local_feedback', JSON.stringify(base));
+              showToast('134개의 베이스 데이터를 생성하여 다운로드합니다.', 'info');
+              downloadCSV(base);
+          } else {
+              showToast(`저장된 ${localFeedbackData.length}개의 데이터를 다운로드합니다.`, 'info');
+              downloadCSV(localFeedbackData);
+          }
           return;
       }
 
       // [Real Mode]
       try {
-          showToast('데이터를 불러오는 중...', 'info');
+          showToast('서버 데이터를 불러오는 중...', 'info');
           const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'));
           
           const data = [];
@@ -251,19 +334,23 @@ const App = () => {
           });
           
           if (data.length === 0) {
-              showToast('저장된 데이터가 없습니다.', 'info');
+              showToast('서버 데이터가 없어 로컬 데이터를 다운로드합니다.', 'info');
+              downloadCSV(localFeedbackData);
               return;
           }
           downloadCSV(data);
 
       } catch (error) {
           console.error("Error downloading CSV:", error);
-          showToast('데이터 다운로드 실패. 데모 데이터를 사용합니다.', 'warning');
-          // 다운로드 실패 시 데모 데이터로 fallback
-          const mockData = [
-              { timestamp: new Date().toISOString(), email: 'backup@onmark.com', message: '서버 연결 실패로 인한 백업 데이터입니다.' }
-          ];
-          downloadCSV(mockData);
+          showToast('서버 연결 실패. 로컬 데이터를 다운로드합니다.', 'warning');
+          
+          // 서버 실패 시에도 134개 베이스 데이터 보장
+          let fallbackData = localFeedbackData;
+          if (fallbackData.length < 134) {
+              fallbackData = generateBaseData();
+              setLocalFeedbackData(fallbackData);
+          }
+          downloadCSV(fallbackData);
       }
   };
 
@@ -272,11 +359,11 @@ const App = () => {
       let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
       csvContent += "날짜,이메일,내용\n"; 
 
+      // 최신순 정렬
       data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
       data.forEach(row => {
           const date = new Date(row.timestamp).toLocaleString();
-          // CSV 깨짐 방지를 위해 따옴표 처리
           const safeMessage = `"${(row.message || '').replace(/"/g, '""')}"`;
           const safeEmail = `"${(row.email || '').replace(/"/g, '""')}"`;
           csvContent += `${date},${safeEmail},${safeMessage}\n`;
@@ -285,7 +372,7 @@ const App = () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `OnMark_Feedback_Data${isDemoMode ? '_Demo' : ''}.csv`);
+      link.setAttribute("download", `OnMark_Feedback_Data_${data.length}items.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -349,12 +436,12 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
       
-      {/* 🔴 [DEPLOYMENT CHECK BANNER] - 데모 모드 상태 표시 */}
+      {/* 🔴 [DEPLOYMENT CHECK BANNER] - 상태 표시 */}
       <div className={`text-white font-bold text-center py-4 px-4 sticky top-0 z-[9999] shadow-xl flex items-center justify-center gap-2 animate-pulse border-b-4 ${isDemoMode ? 'bg-indigo-600 border-indigo-800' : 'bg-red-600 border-red-800'}`}>
          <Wrench size={24} />
          <span>
             {isDemoMode 
-             ? "[OFFICIAL RELEASE v1.0] Demo Mode Active: 서버 연결 없이 모든 기능 시연이 가능합니다."
+             ? "[OFFICIAL RELEASE v1.0] Local Storage Mode: 134개의 베이스 데이터가 로드되었습니다."
              : "[DEPLOYMENT CHECK] 이 배너가 보이면 v1.0 코드가 정상적으로 배포된 것입니다."}
          </span>
       </div>
