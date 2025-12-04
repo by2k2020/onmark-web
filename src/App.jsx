@@ -1,3 +1,4 @@
+// OnMark Web - v0.9.5 (Firebase Integrated)
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
@@ -146,6 +147,7 @@ const OnMarkWeb = () => {
     setIsSubmitting(true);
 
     try {
+        console.log("Submitting feedback to Firestore...");
         // Firestore에 데이터 저장 (Rule 1 준수)
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
             message: feedbackMessage,
