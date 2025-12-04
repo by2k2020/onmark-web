@@ -1,4 +1,4 @@
-// OnMark Web - v0.9.7 (Debug Banner Added)
+// OnMark Web - v0.9.8 (Visual Confirmation Banner)
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
@@ -278,9 +278,9 @@ const OnMarkWeb = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
       
-      {/* 🔴 DEBUG BANNER (버전 확인용) */}
-      <div className="bg-red-600 text-white text-center py-2 font-bold text-sm fixed top-0 left-0 w-full z-[9999]">
-        ⚠️ 현재 버전: v0.9.7 (업데이트 확인용) - 이 배너가 보이면 최신 버전입니다.
+      {/* 🔴 DEBUG BANNER (버전 확인용 - v0.9.8) */}
+      <div className="bg-yellow-500 text-black text-center py-3 font-bold text-lg fixed top-0 left-0 w-full z-[9999] animate-pulse shadow-xl border-b-4 border-yellow-700">
+        🚧 [확인용 배너] v0.9.8 업데이트 적용됨 (이게 보여야 최신입니다!) 🚧
       </div>
 
       {/* Toast Notification */}
@@ -370,8 +370,8 @@ const OnMarkWeb = () => {
         </div>
       )}
 
-      {/* Top Banner */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-xs md:text-sm py-2 px-4 text-center text-blue-100 font-medium z-50 relative mt-8">
+      {/* Top Banner (Margin added to avoid overlap with debug banner) */}
+      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-xs md:text-sm py-2 px-4 text-center text-blue-100 font-medium z-50 relative mt-14">
         <span className="inline-flex items-center gap-2">
           <Activity size={14} className="animate-pulse text-blue-400" />
           현재 <span className="font-bold text-white">Open Beta v0.9</span> 테스트 중입니다. 여러분의 소중한 피드백이 더 안전한 세상을 만듭니다.
