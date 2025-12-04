@@ -228,6 +228,13 @@ const OnMarkWeb = () => {
                       </div>
                       <button 
                         onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedImage;
+                          link.download = 'OnMark_Protected_Image.png'; // 다운로드 파일명 지정
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                          
                           showToast('보호된 이미지가 다운로드되었습니다.', 'success');
                           handleCloseUploadModal();
                         }}
