@@ -15,8 +15,9 @@ const OnMarkWeb = () => {
   const [feedbackMessage, setFeedbackMessage] = useState(''); 
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // 기능 2: 경찰청 대시보드 시뮬레이션 상태 (업그레이드: 파일 업로드 기반 분석)
+  // 기능 2: 경찰청 대시보드 시뮬레이션 상태 (업그레이드: 랜덤 분석 결과)
   const [analysisStatus, setAnalysisStatus] = useState('idle'); // idle, analyzing, complete
+  const [analysisResult, setAnalysisResult] = useState(null); // 'detected' (위변조) or 'clean' (정상)
   const [forensicImage, setForensicImage] = useState(null); // 분석할 이미지
   const forensicFileInputRef = useRef(null);
   
@@ -105,19 +106,28 @@ const OnMarkWeb = () => {
     }
   };
 
-  // 경찰청 분석 파일 선택 핸들러 (NEW)
+  // 경찰청 분석 파일 선택 핸들러 (수정: 랜덤 결과 시뮬레이션)
   const handleForensicFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setForensicImage(imageUrl);
       setAnalysisStatus('analyzing');
+      setAnalysisResult(null); // 결과 초기화
       showToast('증거물이 업로드되었습니다. AI 정밀 분석을 시작합니다.', 'info');
 
-      // 분석 시뮬레이션
+      // 분석 시뮬레이션 (3초 후 결과 도출)
       setTimeout(() => {
         setAnalysisStatus('complete');
-        showToast('분석 완료: 위변조 흔적 및 워터마크가 검출되었습니다.', 'warning');
+        // 50% 확률로 정상/위변조 결정
+        const isForged = Math.random() > 0.5;
+        setAnalysisResult(isForged ? 'detected' : 'clean');
+
+        if (isForged) {
+          showToast('분석 완료: 위변조 흔적 및 워터마크 훼손이 검출되었습니다.', 'warning');
+        } else {
+          showToast('분석 완료: 위변조 흔적이 없는 정상 이미지입니다.', 'success');
+        }
       }, 3000);
     }
   };
@@ -499,14 +509,14 @@ const OnMarkWeb = () => {
                     <input 
                       type="file" 
                       ref={forensicFileInputRef} 
-                      className="hidden" // <--- 실제 input은 숨겨져 있음
+                      className="hidden" 
                       accept="image/*" 
                       onChange={handleForensicFileSelect} 
                     />
                     <button 
-                      onClick={() => forensicFileInputRef.current?.click()} // <--- 이 버튼이 트리거 역할
+                      onClick={() => forensicFileInputRef.current?.click()}
                       disabled={analysisStatus === 'analyzing'}
-                      className={`px-4 py-2 rounded-lg ...`}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold border flex items-center gap-2 transition-all ${analysisStatus === 'analyzing' ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-wait' : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50'}`}
                     >
                       {analysisStatus === 'analyzing' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                       {analysisStatus === 'analyzing' ? '분석 중...' : '증거물 업로드 및 분석'}
@@ -544,8 +554,8 @@ const OnMarkWeb = () => {
                         <div className={`h-full bg-blue-500 transition-all ease-out duration-[3000ms] ${analysisStatus === 'analyzing' ? 'w-[85%]' : analysisStatus === 'complete' ? 'w-[100%]' : 'w-[0%]'}`}></div>
                      </div>
                      <div className="flex justify-between text-xs text-slate-400">
-                        <span>워터마크 복구율: {analysisStatus === 'complete' ? '98.2%' : analysisStatus === 'analyzing' ? '계산 중...' : '대기 중'}</span>
-                        <span>{analysisStatus === 'complete' ? '유포 경로 추적 완료' : analysisStatus === 'analyzing' ? '추적 중...' : '분석 대기'}</span>
+                        <span>워터마크 복구율: {analysisStatus === 'complete' ? (analysisResult === 'detected' ? '20.4% (훼손됨)' : '99.8%') : analysisStatus === 'analyzing' ? '계산 중...' : '대기 중'}</span>
+                        <span>{analysisStatus === 'complete' ? '분석 완료' : analysisStatus === 'analyzing' ? '추적 중...' : '분석 대기'}</span>
                      </div>
                   </div>
                 </div>
@@ -557,14 +567,31 @@ const OnMarkWeb = () => {
                       {analysisStatus === 'complete' ? '2024.12.04 14:22:10' : '0000.00.00 00:00:00'}
                     </div>
                   </div>
-                  <div className={`bg-slate-900 p-4 rounded-xl border transition-colors duration-500 ${analysisStatus === 'complete' ? 'border-red-500/50 bg-red-500/10' : 'border-slate-800'}`}>
+                  
+                  {/* Analysis Result Box - Dynamic Color */}
+                  <div className={`bg-slate-900 p-4 rounded-xl border transition-colors duration-500 ${
+                      analysisStatus === 'complete' 
+                          ? (analysisResult === 'detected' ? 'border-red-500/50 bg-red-500/10' : 'border-green-500/50 bg-green-500/10')
+                          : 'border-slate-800'
+                  }`}>
                      <div className="text-xs text-slate-500 mb-1">위변조 여부</div>
-                     <div className={`font-bold flex items-center gap-2 ${analysisStatus === 'complete' ? 'text-red-400' : analysisStatus === 'analyzing' ? 'text-blue-400 animate-pulse' : 'text-slate-500'}`}>
+                     <div className={`font-bold flex items-center gap-2 ${
+                         analysisStatus === 'complete' 
+                             ? (analysisResult === 'detected' ? 'text-red-400' : 'text-green-400')
+                             : analysisStatus === 'analyzing' ? 'text-blue-400 animate-pulse' : 'text-slate-500'
+                     }`}>
                        {analysisStatus === 'complete' ? (
-                         <>
-                           <AlertTriangle size={16} />
-                           탐지됨 (Face Swap)
-                         </>
+                           analysisResult === 'detected' ? (
+                               <>
+                                   <AlertTriangle size={16} />
+                                   탐지됨 (Face Swap)
+                               </>
+                           ) : (
+                               <>
+                                   <CheckCircle size={16} />
+                                   정상 (Authentic)
+                               </>
+                           )
                        ) : analysisStatus === 'analyzing' ? (
                          <>
                            <Loader2 size={16} className="animate-spin" />
