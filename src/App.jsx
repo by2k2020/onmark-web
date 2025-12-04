@@ -3,8 +3,13 @@ import {
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
   AlertTriangle, ChevronRight, Menu, X, Smartphone, Siren, 
   Database, Server, Fingerprint, Award, TrendingUp, Info,
-  Upload, Image as ImageIcon, Download, Loader2, Check, Scan, Zap
+  Upload, Image as ImageIcon, Download, Loader2, Check, Scan, Zap, FileText
 } from 'lucide-react';
+
+// Firebase SDK Imports
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
+import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
 
 const OnMarkWeb = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -14,12 +19,13 @@ const OnMarkWeb = () => {
   const [feedbackEmail, setFeedbackEmail] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState(''); 
   const [feedbackSent, setFeedbackSent] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 제출 중 로딩 상태
 
   // 기능 2: 경찰청 대시보드 시뮬레이션 상태
-  const [analysisStatus, setAnalysisStatus] = useState('idle'); // idle, analyzing, complete
-  const [analysisResult, setAnalysisResult] = useState(null); // 'detected' (위변조) or 'clean' (정상)
-  const [forensicImage, setForensicImage] = useState(null); // 분석할 이미지
-  const [forensicFileName, setForensicFileName] = useState(''); // 파일명 저장
+  const [analysisStatus, setAnalysisStatus] = useState('idle');
+  const [analysisResult, setAnalysisResult] = useState(null); 
+  const [forensicImage, setForensicImage] = useState(null); 
+  const [forensicFileName, setForensicFileName] = useState(''); 
   const forensicFileInputRef = useRef(null);
   
   // 기능 3: 팝업 메시지 (Toast)
@@ -40,6 +46,39 @@ const OnMarkWeb = () => {
   // 기능 6: 스크롤 애니메이션
   const [isVisible, setIsVisible] = useState({});
 
+  // Firebase State
+  const [user, setUser] = useState(null);
+  const [db, setDb] = useState(null);
+  const [appId, setAppId] = useState(null);
+
+  // --- Firebase Initialization & Auth ---
+  useEffect(() => {
+    // 환경 변수에서 설정 가져오기 (실행 환경에서 자동 제공됨)
+    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+    setAppId(currentAppId);
+
+    if (firebaseConfig.apiKey) {
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const firestore = getFirestore(app);
+        setDb(firestore);
+
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+        initAuth();
+
+        const unsubscribe = onAuthStateChanged(auth, setUser);
+        return () => unsubscribe();
+    }
+  }, []);
+
+  // --- Scroll Observer ---
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -59,7 +98,7 @@ const OnMarkWeb = () => {
     return () => observer.disconnect();
   }, []);
 
-  // 슬라이더 핸들러
+  // --- Slider Handlers ---
   const handleMouseDown = () => setIsResizing(true);
   const handleMouseUp = () => setIsResizing(false);
   const handleMouseMove = (e) => {
@@ -91,23 +130,94 @@ const OnMarkWeb = () => {
     };
   }, [isResizing]);
 
-  // 피드백 전송 핸들러
-  const handleFeedbackSubmit = (e) => {
+  // --- Feedback Submit Handler (Firestore Integration) ---
+  const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
-    if(feedbackMessage.trim().length > 0) {
-      setFeedbackSent(true);
-      showToast('소중한 의견이 개발팀으로 전송되었습니다.', 'success');
-      setTimeout(() => {
-        setFeedbackSent(false);
-        setFeedbackMessage('');
-        setFeedbackEmail('');
-      }, 3000);
-    } else {
+    if(feedbackMessage.trim().length === 0) {
       showToast('의견 내용을 입력해주세요.', 'error');
+      return;
+    }
+
+    if (!db || !user) {
+        showToast('서버 연결 중입니다. 잠시 후 다시 시도해주세요.', 'warning');
+        return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+        // Firestore에 데이터 저장 (Rule 1 준수)
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
+            message: feedbackMessage,
+            email: feedbackEmail || 'anonymous',
+            timestamp: new Date().toISOString(),
+            userId: user.uid
+        });
+
+        setFeedbackSent(true);
+        showToast('소중한 의견이 서버에 안전하게 저장되었습니다.', 'success');
+        
+        setTimeout(() => {
+            setFeedbackSent(false);
+            setFeedbackMessage('');
+            setFeedbackEmail('');
+        }, 3000);
+    } catch (error) {
+        console.error("Error adding document: ", error);
+        showToast('전송 중 오류가 발생했습니다.', 'error');
+    } finally {
+        setIsSubmitting(false);
     }
   };
 
-  // 경찰청 분석 파일 선택 핸들러 (수정: 파일명 기반 결정적 로직 구현)
+  // --- Download Feedback as CSV (Admin Feature) ---
+  const handleDownloadCSV = async () => {
+      if (!db || !user) {
+          showToast('데이터를 불러올 권한이 없습니다.', 'error');
+          return;
+      }
+
+      try {
+          showToast('데이터를 불러오는 중...', 'info');
+          const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'));
+          
+          let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // 한글 깨짐 방지 BOM
+          csvContent += "날짜,이메일,내용\n"; // 헤더
+
+          const data = [];
+          querySnapshot.forEach((doc) => {
+              const d = doc.data();
+              data.push(d);
+          });
+
+          // 날짜순 정렬 (클라이언트 측)
+          data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+          data.forEach(row => {
+              const date = new Date(row.timestamp).toLocaleString();
+              // CSV 이스케이프 처리 (콤마, 줄바꿈 등)
+              const safeMessage = `"${(row.message || '').replace(/"/g, '""')}"`;
+              const safeEmail = `"${(row.email || '').replace(/"/g, '""')}"`;
+              csvContent += `${date},${safeEmail},${safeMessage}\n`;
+          });
+
+          const encodedUri = encodeURI(csvContent);
+          const link = document.createElement("a");
+          link.setAttribute("href", encodedUri);
+          link.setAttribute("download", "OnMark_Feedback_Data.csv");
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+
+          showToast('피드백 데이터 다운로드가 완료되었습니다.', 'success');
+
+      } catch (error) {
+          console.error("Error downloading CSV:", error);
+          showToast('데이터 다운로드 실패', 'error');
+      }
+  };
+
+  // --- Other Logic (Forensic, Upload Modal) ---
   const handleForensicFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -115,17 +225,13 @@ const OnMarkWeb = () => {
       setForensicImage(imageUrl);
       setForensicFileName(file.name);
       setAnalysisStatus('analyzing');
-      setAnalysisResult(null); // 결과 초기화
+      setAnalysisResult(null); 
       showToast(`'${file.name}' 업로드 완료. AI 정밀 분석을 시작합니다.`, 'info');
 
-      // 결정적 로직: 파일명에 특정 키워드가 포함되어 있는지 확인
       const fileNameLower = file.name.toLowerCase();
       const detectedKeywords = ['fake', 'deepfake', 'edit', 'manipul', '가짜', '위변조', 'copy', 'faked'];
-      
-      // 키워드가 포함되면 '위변조(detected)', 아니면 '정상(clean)'
       const isForged = detectedKeywords.some(keyword => fileNameLower.includes(keyword));
 
-      // 분석 시뮬레이션 (3초 후 결과 도출)
       setTimeout(() => {
         setAnalysisStatus('complete');
         setAnalysisResult(isForged ? 'detected' : 'clean');
@@ -139,15 +245,12 @@ const OnMarkWeb = () => {
     }
   };
 
-  // 사진 보호 프로세스
   const handleOpenUploadModal = () => {
     setIsUploadModalOpen(true);
     setUploadStep('idle');
     setSelectedImage(null);
   };
-  const handleCloseUploadModal = () => {
-    setIsUploadModalOpen(false);
-  };
+  const handleCloseUploadModal = () => setIsUploadModalOpen(false);
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -178,6 +281,7 @@ const OnMarkWeb = () => {
         <div className="bg-slate-800/90 backdrop-blur border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 whitespace-nowrap">
           {toast.type === 'success' ? <CheckCircle className="text-green-400" size={20} /> : 
            toast.type === 'warning' ? <AlertTriangle className="text-red-400" size={20} /> :
+           toast.type === 'error' ? <AlertTriangle className="text-red-500" size={20} /> :
            <Info className="text-blue-400" size={20} />}
           <span className="font-medium text-sm">{toast.message}</span>
         </div>
@@ -648,7 +752,7 @@ const OnMarkWeb = () => {
          </div>
       </section>
 
-      {/* Beta Feedback Form */}
+      {/* Beta Feedback Form (Integrated with Firestore) */}
       <section className="py-20 px-4 max-w-3xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4">여러분의 의견을 들려주세요</h2>
         <p className="text-slate-400 mb-8">OnMark는 현재 베타 테스트 단계입니다. <br/>서비스 개선을 위해 사용자 여러분의 피드백을 적극 반영하고 있습니다.</p>
@@ -656,20 +760,48 @@ const OnMarkWeb = () => {
            <div className="flex flex-col gap-4 text-left">
               <div>
                 <label className="block text-sm font-medium text-slate-300 mb-2">어떤 점이 개선되면 좋을까요?</label>
-                <textarea className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32 resize-none placeholder-slate-600" placeholder="예: 인스타그램 업로드 시 화질 저하가 궁금합니다. / 앱 사용이 조금 더 간편했으면 좋겠어요." value={feedbackMessage} onChange={(e) => setFeedbackMessage(e.target.value)}></textarea>
+                <textarea 
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32 resize-none placeholder-slate-600" 
+                  placeholder="예: 인스타그램 업로드 시 화질 저하가 궁금합니다. / 앱 사용이 조금 더 간편했으면 좋겠어요." 
+                  value={feedbackMessage} 
+                  onChange={(e) => setFeedbackMessage(e.target.value)}
+                  disabled={isSubmitting}
+                ></textarea>
               </div>
               <div className="flex flex-col sm:flex-row gap-4 items-end">
                 <div className="flex-1 w-full">
                    <label className="block text-sm font-medium text-slate-300 mb-2">이메일 (선택)</label>
-                   <input type="email" value={feedbackEmail} onChange={(e) => setFeedbackEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600" placeholder="contact@email.com" />
+                   <input 
+                    type="email" 
+                    value={feedbackEmail} 
+                    onChange={(e) => setFeedbackEmail(e.target.value)} 
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600" 
+                    placeholder="contact@email.com" 
+                    disabled={isSubmitting}
+                   />
                 </div>
-                <button type="submit" className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${feedbackSent ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'}`}>
-                  {feedbackSent ? <CheckCircle size={20} /> : <Send size={20} />}
-                  {feedbackSent ? '전송 완료' : '피드백 보내기'}
+                <button 
+                  type="submit" 
+                  className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${feedbackSent ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'} ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : feedbackSent ? <CheckCircle size={20} /> : <Send size={20} />}
+                  {isSubmitting ? '전송 중...' : feedbackSent ? '전송 완료' : '피드백 보내기'}
                 </button>
               </div>
            </div>
-           <p className="text-xs text-slate-500 mt-4 text-left">* 보내주신 의견은 OnMark 서비스 고도화 및 심사 발표 자료 보완에 소중히 사용됩니다.</p>
+           
+           {/* Admin Download Link */}
+           <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
+             <p className="text-xs text-slate-500">* 보내주신 의견은 OnMark 서비스 고도화 및 심사 발표 자료 보완에 소중히 사용됩니다.</p>
+             <button 
+               type="button"
+               onClick={handleDownloadCSV}
+               className="text-xs text-slate-600 hover:text-blue-400 flex items-center gap-1 transition-colors"
+             >
+               <FileText size={12} /> 관리자: 데이터 다운로드 (.csv)
+             </button>
+           </div>
         </form>
       </section>
 
