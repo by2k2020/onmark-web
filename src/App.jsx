@@ -1,9 +1,11 @@
+// [Vercel Trigger] FINAL TRIGGER - Timestamp: 2024.12.05 (Re-push)
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
   AlertTriangle, ChevronRight, Menu, X, Smartphone, Siren, 
   Database, Server, Fingerprint, Award, TrendingUp, Info,
-  Upload, Image as ImageIcon, Download, Loader2, Check, Scan, Zap, FileText
+  Upload, Image as ImageIcon, Download, Loader2, Check, Scan, Zap, FileText,
+  Wrench // 디버그용 아이콘 추가
 } from 'lucide-react';
 
 // Firebase SDK Imports
@@ -272,6 +274,12 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
       
+      {/* 🔴 [DEBUG MODE BANNER] - 배포 확인용 강제 배너 */}
+      <div className="bg-red-600 text-white font-bold text-center py-4 px-4 sticky top-0 z-[9999] shadow-xl flex items-center justify-center gap-2 animate-pulse border-b-4 border-red-800">
+         <Wrench size={24} />
+         <span>[DEPLOYMENT CHECK] 이 배너가 보이면 v1.0 코드가 정상적으로 배포된 것입니다.</span>
+      </div>
+
       {/* Toast Notification */}
       <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[110] transition-all duration-300 ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
         <div className="bg-slate-800/90 backdrop-blur border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 whitespace-nowrap">
@@ -374,8 +382,8 @@ const App = () => {
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <Shield className="text-blue-500 fill-blue-500/20" size={28} />
               <span className="text-xl font-bold tracking-tight">OnMark</span>
-              {/* Updated Badge */}
-              <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30 ml-1">v1.0</span>
+              {/* Updated Badge to DEBUG for verification */}
+              <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 ml-1">v1.0 (DEBUG)</span>
             </div>
             <div className="hidden md:flex space-x-8 items-center text-sm font-medium text-slate-300">
               <a href="#problem" className="hover:text-white transition-colors">문제 정의</a>
