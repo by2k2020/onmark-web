@@ -499,14 +499,14 @@ const OnMarkWeb = () => {
                     <input 
                       type="file" 
                       ref={forensicFileInputRef} 
-                      className="hidden" 
+                      className="hidden" // <--- 실제 input은 숨겨져 있음
                       accept="image/*" 
                       onChange={handleForensicFileSelect} 
                     />
                     <button 
-                      onClick={() => forensicFileInputRef.current?.click()}
+                      onClick={() => forensicFileInputRef.current?.click()} // <--- 이 버튼이 트리거 역할
                       disabled={analysisStatus === 'analyzing'}
-                      className={`px-4 py-2 rounded-lg text-xs font-bold border flex items-center gap-2 transition-all ${analysisStatus === 'analyzing' ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-wait' : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50'}`}
+                      className={`px-4 py-2 rounded-lg ...`}
                     >
                       {analysisStatus === 'analyzing' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                       {analysisStatus === 'analyzing' ? '분석 중...' : '증거물 업로드 및 분석'}
