@@ -15,8 +15,10 @@ const OnMarkWeb = () => {
   const [feedbackMessage, setFeedbackMessage] = useState(''); 
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // 기능 2: 경찰청 대시보드 시뮬레이션 상태 (업그레이드: 3단계 상태 관리)
+  // 기능 2: 경찰청 대시보드 시뮬레이션 상태 (업그레이드: 파일 업로드 기반 분석)
   const [analysisStatus, setAnalysisStatus] = useState('idle'); // idle, analyzing, complete
+  const [forensicImage, setForensicImage] = useState(null); // 분석할 이미지
+  const forensicFileInputRef = useRef(null);
   
   // 기능 3: 팝업 메시지 (Toast)
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
@@ -103,20 +105,22 @@ const OnMarkWeb = () => {
     }
   };
 
-  // 경찰청 긴급 분석 시뮬레이션 (기능 구현 강화)
-  const handleEmergencyAnalysis = () => {
-    if (analysisStatus === 'analyzing') return; // 분석 중 중복 클릭 방지
-    
-    // 리셋 후 재분석 가능하도록
-    setAnalysisStatus('analyzing');
-    showToast('긴급 분석 요청이 접수되었습니다. AI 모델 분석 시작...', 'info');
-    
-    // 3초 후 완료 처리
-    setTimeout(() => {
+  // 경찰청 분석 파일 선택 핸들러 (NEW)
+  const handleForensicFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const imageUrl = URL.createObjectURL(file);
+      setForensicImage(imageUrl);
+      setAnalysisStatus('analyzing');
+      showToast('증거물이 업로드되었습니다. AI 정밀 분석을 시작합니다.', 'info');
+
+      // 분석 시뮬레이션
+      setTimeout(() => {
         setAnalysisStatus('complete');
-        showToast('분석 완료: 위변조 흔적(Face Swap)이 발견되었습니다.', 'warning'); // 경고 메시지
-    }, 3000);
-  }
+        showToast('분석 완료: 위변조 흔적 및 워터마크가 검출되었습니다.', 'warning');
+      }, 3000);
+    }
+  };
 
   // 사진 보호 프로세스
   const handleOpenUploadModal = () => {
@@ -487,34 +491,57 @@ const OnMarkWeb = () => {
                 </div>
               </div>
 
-              {/* Main Content */}
+              {/* Main Content - Upload & Analyze */}
               <div className="p-6 md:p-8">
                 <div className="flex justify-between items-center mb-8">
                   <h3 className="text-xl font-bold">실시간 추적 분석</h3>
-                  <button 
-                    onClick={handleEmergencyAnalysis}
-                    disabled={analysisStatus === 'analyzing'}
-                    className={`px-3 py-1 rounded text-xs font-medium border transition-all ${analysisStatus === 'analyzing' ? 'bg-red-500 text-white border-red-500 animate-pulse cursor-wait' : analysisStatus === 'complete' ? 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700' : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'}`}
-                  >
-                    {analysisStatus === 'analyzing' ? '분석 진행 중...' : analysisStatus === 'complete' ? '분석 완료 (다시 하기)' : '긴급 분석 요청'}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="file" 
+                      ref={forensicFileInputRef} 
+                      className="hidden" 
+                      accept="image/*" 
+                      onChange={handleForensicFileSelect} 
+                    />
+                    <button 
+                      onClick={() => forensicFileInputRef.current?.click()}
+                      disabled={analysisStatus === 'analyzing'}
+                      className={`px-4 py-2 rounded-lg text-xs font-bold border flex items-center gap-2 transition-all ${analysisStatus === 'analyzing' ? 'bg-slate-800 text-slate-500 border-slate-700 cursor-wait' : 'bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:border-red-500/50'}`}
+                    >
+                      {analysisStatus === 'analyzing' ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+                      {analysisStatus === 'analyzing' ? '분석 중...' : '증거물 업로드 및 분석'}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Tracking Visualization */}
                 <div className="bg-slate-900 rounded-xl border border-slate-800 p-6 mb-6">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center text-slate-600">
-                      <Users size={32} />
+                    <div className="w-16 h-16 bg-slate-800 rounded-lg flex items-center justify-center text-slate-600 overflow-hidden relative border border-slate-700">
+                      {forensicImage ? (
+                        <img src={forensicImage} alt="Forensic Target" className="w-full h-full object-cover" />
+                      ) : (
+                        <Users size={32} />
+                      )}
+                      {analysisStatus === 'analyzing' && (
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                          <Loader2 className="text-blue-400 animate-spin" size={20} />
+                        </div>
+                      )}
                     </div>
                     <div>
-                       <div className="text-sm text-slate-400">Target ID: #CASE-2024-8832</div>
-                       <div className="font-mono text-blue-400 text-sm mt-1">Key: 7BxE93pYfQaRwMtZ2...</div>
+                       <div className="text-sm text-slate-400">Target ID: {forensicImage ? '#ANALYSIS-REQ-2024' : '파일을 업로드하세요'}</div>
+                       <div className="font-mono text-blue-400 text-sm mt-1">
+                         {analysisStatus === 'idle' ? 'Status: Waiting for input' : 
+                          analysisStatus === 'analyzing' ? 'Status: Decrypting Watermark...' : 
+                          'Key: 7BxE93pYfQaRwMtZ2...'}
+                       </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div className={`h-full bg-blue-500 transition-all ease-out duration-[3000ms] ${analysisStatus === 'analyzing' ? 'w-[85%]' : analysisStatus === 'complete' ? 'w-[100%]' : 'w-[5%]'}`}></div>
+                        <div className={`h-full bg-blue-500 transition-all ease-out duration-[3000ms] ${analysisStatus === 'analyzing' ? 'w-[85%]' : analysisStatus === 'complete' ? 'w-[100%]' : 'w-[0%]'}`}></div>
                      </div>
                      <div className="flex justify-between text-xs text-slate-400">
                         <span>워터마크 복구율: {analysisStatus === 'complete' ? '98.2%' : analysisStatus === 'analyzing' ? '계산 중...' : '대기 중'}</span>
