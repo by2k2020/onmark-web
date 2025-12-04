@@ -2,17 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
   AlertTriangle, ChevronRight, Menu, X, Smartphone, Siren, 
-  Database, Server, Fingerprint, Award, TrendingUp 
+  Database, Server, Fingerprint, Award, TrendingUp, Info
 } from 'lucide-react';
 
 const OnMarkWeb = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [demoState, setDemoState] = useState('original'); // original vs protected
-  const [activeTab, setActiveTab] = useState('b2c'); // b2c, b2b, b2g
+  const [demoState, setDemoState] = useState('original'); 
+  const [activeTab, setActiveTab] = useState('b2c'); 
   const [feedbackEmail, setFeedbackEmail] = useState('');
   const [feedbackSent, setFeedbackSent] = useState(false);
+  
+  // 팝업 메시지 상태 관리 (추가된 기능)
+  const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
-  // Scroll animations
+  // 스크롤 애니메이션
   const [isVisible, setIsVisible] = useState({});
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -33,19 +36,42 @@ const OnMarkWeb = () => {
     return () => observer.disconnect();
   }, []);
 
+  // 피드백 전송 핸들러
   const handleFeedbackSubmit = (e) => {
     e.preventDefault();
     if(feedbackEmail) {
       setFeedbackSent(true);
+      showToast('소중한 의견 감사합니다! 개발팀에 전달되었습니다.', 'success');
       setTimeout(() => setFeedbackSent(false), 3000);
       setFeedbackEmail('');
+    } else {
+      showToast('내용을 입력해주세요.', 'error');
     }
   };
 
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden">
+  // 팝업 띄우기 함수 (추가된 기능)
+  const showToast = (message, type = 'info') => {
+    setToast({ show: true, message, type });
+    setTimeout(() => setToast({ ...toast, show: false }), 3000);
+  };
 
-      {/* Top Banner - Awards & Beta Notice */}
+  // 준비 중인 기능 안내 (버튼 클릭 시 실행)
+  const handleNotReady = (featureName) => {
+    showToast(`'${featureName}' 기능은 현재 준비 중입니다.`, 'info');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
+
+      {/* Toast Notification (알림 팝업) */}
+      <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[100] transition-all duration-300 ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+        <div className="bg-slate-800/90 backdrop-blur border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3">
+          {toast.type === 'success' ? <CheckCircle className="text-green-400" size={20} /> : <Info className="text-blue-400" size={20} />}
+          <span className="font-medium text-sm">{toast.message}</span>
+        </div>
+      </div>
+
+      {/* Top Banner */}
       <div className="bg-gradient-to-r from-indigo-900 via-blue-900 to-indigo-900 text-[10px] md:text-xs py-2 px-4 text-center text-blue-100 font-medium z-50 relative border-b border-blue-800/30">
         <span className="inline-flex items-center gap-2 flex-wrap justify-center">
           <Award size={14} className="text-yellow-400" />
@@ -62,7 +88,7 @@ const OnMarkWeb = () => {
       <nav className="sticky top-0 z-40 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo(0,0)}>
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <Shield className="text-blue-500 fill-blue-500/20" size={28} />
               <span className="text-xl font-bold tracking-tight">OnMark</span>
             </div>
@@ -73,7 +99,10 @@ const OnMarkWeb = () => {
               <a href="#technology" className="hover:text-white transition-colors">핵심 기술</a>
               <a href="#police-solution" className="hover:text-white transition-colors">솔루션</a>
               <a href="#business" className="hover:text-white transition-colors">서비스 모델</a>
-              <button className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-900/20 text-sm font-semibold flex items-center gap-2">
+              <button 
+                onClick={() => handleNotReady('보호 시작하기')}
+                className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-900/20 text-sm font-semibold flex items-center gap-2"
+              >
                 보호 시작하기 <ChevronRight size={14} />
               </button>
             </div>
@@ -94,7 +123,12 @@ const OnMarkWeb = () => {
             <a href="#technology" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-white">핵심 기술</a>
             <a href="#police-solution" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-white">솔루션</a>
             <a href="#business" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-white">서비스 모델</a>
-            <button className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium mt-4">보호 시작하기</button>
+            <button 
+              onClick={() => { handleNotReady('보호 시작하기'); setIsMenuOpen(false); }}
+              className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium mt-4"
+            >
+              보호 시작하기
+            </button>
           </div>
         )}
       </nav>
@@ -129,11 +163,17 @@ const OnMarkWeb = () => {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <button className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 group">
+            <button 
+              onClick={() => handleNotReady('사진 보호 업로드')}
+              className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 group"
+            >
               <Smartphone size={18} className="group-hover:scale-110 transition-transform"/>
               무료로 사진 보호하기
             </button>
-            <button className="w-full sm:w-auto px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
+            <button 
+              onClick={() => handleNotReady('기술 백서 다운로드')}
+              className="w-full sm:w-auto px-8 py-3.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2"
+            >
               <FileSearch size={18} />
               기술 백서(Whitepaper) 보기
             </button>
@@ -141,7 +181,7 @@ const OnMarkWeb = () => {
         </div>
       </section>
 
-      {/* Problem Section (Statistics based on PDF) */}
+      {/* Problem Section */}
       <section id="problem" className={`py-20 bg-slate-900/50 border-y border-slate-800 transition-all duration-1000 ${isVisible.problem ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 gap-12 items-center">
@@ -157,7 +197,7 @@ const OnMarkWeb = () => {
               </p>
               
               <div className="space-y-4">
-                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-red-500/30 transition-colors">
                   <div className="bg-red-500/10 p-3 rounded-lg text-red-500">
                     <TrendingUp size={24} />
                   </div>
@@ -166,7 +206,7 @@ const OnMarkWeb = () => {
                     <div className="text-sm text-slate-500">2024년 10월 기준 누적 피해 (21년 대비 급증)</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-4 bg-slate-950 p-4 rounded-xl border border-slate-800 hover:border-orange-500/30 transition-colors">
                   <div className="bg-orange-500/10 p-3 rounded-lg text-orange-500">
                     <AlertTriangle size={24} />
                   </div>
@@ -212,7 +252,7 @@ const OnMarkWeb = () => {
         </div>
       </section>
 
-      {/* Technology Section (Based on PDF Technical Details) */}
+      {/* Technology Section */}
       <section id="technology" className="py-24 px-4 overflow-hidden relative">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -522,17 +562,17 @@ const OnMarkWeb = () => {
                 <label className="block text-sm font-medium text-slate-300 mb-2">의견 보내기</label>
                 <textarea
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32 resize-none placeholder-slate-600"
+                  value={feedbackEmail}
+                  onChange={(e) => setFeedbackEmail(e.target.value)}
                   placeholder="예: 인스타그램에 올렸을 때 화질 저하가 있는지 궁금합니다."
                 ></textarea>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 items-end">
                 <div className="flex-1 w-full">
-                   <label className="block text-sm font-medium text-slate-300 mb-2">이메일 (답변을 원하실 경우)</label>
+                   <label className="block text-sm font-medium text-slate-300 mb-2">이메일 (선택)</label>
                    <input
                     type="email"
-                    value={feedbackEmail}
-                    onChange={(e) => setFeedbackEmail(e.target.value)}
                     className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600"
                     placeholder="contact@email.com"
                    />
