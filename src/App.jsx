@@ -1,4 +1,4 @@
-// OnMark Web - v0.9.5 (Firebase Integrated)
+// OnMark Web - v0.9.6 (Visual Version Indicator Added)
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
@@ -20,7 +20,7 @@ const OnMarkWeb = () => {
   const [feedbackEmail, setFeedbackEmail] = useState('');
   const [feedbackMessage, setFeedbackMessage] = useState(''); 
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false); // 제출 중 로딩 상태
+  const [isSubmitting, setIsSubmitting] = useState(false); 
 
   // 기능 2: 경찰청 대시보드 시뮬레이션 상태
   const [analysisStatus, setAnalysisStatus] = useState('idle');
@@ -29,6 +29,9 @@ const OnMarkWeb = () => {
   const [forensicFileName, setForensicFileName] = useState(''); 
   const forensicFileInputRef = useRef(null);
   
+  // 분석 결과 교차(Toggle)를 위한 Ref
+  const lastAnalysisResultRef = useRef('clean'); 
+
   // 기능 3: 팝업 메시지 (Toast)
   const [toast, setToast] = useState({ show: false, message: '', type: 'info' });
 
@@ -54,7 +57,6 @@ const OnMarkWeb = () => {
 
   // --- Firebase Initialization & Auth ---
   useEffect(() => {
-    // 환경 변수에서 설정 가져오기 (실행 환경에서 자동 제공됨)
     const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
     const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     setAppId(currentAppId);
@@ -131,7 +133,7 @@ const OnMarkWeb = () => {
     };
   }, [isResizing]);
 
-  // --- Feedback Submit Handler (Firestore Integration) ---
+  // --- Feedback Submit Handler ---
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     if(feedbackMessage.trim().length === 0) {
@@ -147,8 +149,6 @@ const OnMarkWeb = () => {
     setIsSubmitting(true);
 
     try {
-        console.log("Submitting feedback to Firestore...");
-        // Firestore에 데이터 저장 (Rule 1 준수)
         await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
             message: feedbackMessage,
             email: feedbackEmail || 'anonymous',
@@ -172,7 +172,7 @@ const OnMarkWeb = () => {
     }
   };
 
-  // --- Download Feedback as CSV (Admin Feature) ---
+  // --- Download Feedback as CSV ---
   const handleDownloadCSV = async () => {
       if (!db || !user) {
           showToast('데이터를 불러올 권한이 없습니다.', 'error');
@@ -183,8 +183,8 @@ const OnMarkWeb = () => {
           showToast('데이터를 불러오는 중...', 'info');
           const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'));
           
-          let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; // 한글 깨짐 방지 BOM
-          csvContent += "날짜,이메일,내용\n"; // 헤더
+          let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+          csvContent += "날짜,이메일,내용\n"; 
 
           const data = [];
           querySnapshot.forEach((doc) => {
@@ -192,12 +192,10 @@ const OnMarkWeb = () => {
               data.push(d);
           });
 
-          // 날짜순 정렬 (클라이언트 측)
           data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
           data.forEach(row => {
               const date = new Date(row.timestamp).toLocaleString();
-              // CSV 이스케이프 처리 (콤마, 줄바꿈 등)
               const safeMessage = `"${(row.message || '').replace(/"/g, '""')}"`;
               const safeEmail = `"${(row.email || '').replace(/"/g, '""')}"`;
               csvContent += `${date},${safeEmail},${safeMessage}\n`;
@@ -219,7 +217,7 @@ const OnMarkWeb = () => {
       }
   };
 
-  // --- Other Logic (Forensic, Upload Modal) ---
+  // --- Forensic File Select (Updated: Toggle Logic) ---
   const handleForensicFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -230,18 +228,20 @@ const OnMarkWeb = () => {
       setAnalysisResult(null); 
       showToast(`'${file.name}' 업로드 완료. AI 정밀 분석을 시작합니다.`, 'info');
 
-      const fileNameLower = file.name.toLowerCase();
-      const detectedKeywords = ['fake', 'deepfake', 'edit', 'manipul', '가짜', '위변조', 'copy', 'faked'];
-      const isForged = detectedKeywords.some(keyword => fileNameLower.includes(keyword));
-
+      // 3초 후 결과 도출 (결과를 번갈아가며 보여줌)
       setTimeout(() => {
         setAnalysisStatus('complete');
-        setAnalysisResult(isForged ? 'detected' : 'clean');
+        
+        // 이전 결과와 반대되는 결과를 설정 (Toggle)
+        // clean -> detected -> clean -> detected ...
+        const nextResult = lastAnalysisResultRef.current === 'clean' ? 'detected' : 'clean';
+        lastAnalysisResultRef.current = nextResult;
+        setAnalysisResult(nextResult);
 
-        if (isForged) {
-          showToast(`분석 완료: '${file.name}'에서 치명적 위변조 흔적이 검출되었습니다.`, 'warning');
+        if (nextResult === 'detected') {
+          showToast('분석 완료: 위변조 흔적(Face Swap)이 검출되었습니다.', 'warning');
         } else {
-          showToast(`분석 완료: '${file.name}'은(는) 위변조되지 않은 원본입니다.`, 'success');
+          showToast('분석 완료: 위변조 흔적이 없는 정상(Authentic) 이미지입니다.', 'success');
         }
       }, 3000);
     }
@@ -610,7 +610,7 @@ const OnMarkWeb = () => {
                 </div>
                 <div className="mt-auto pt-8 border-t border-slate-800 mt-32">
                   <div className="text-xs text-slate-500">System Status: <span className="text-green-500">Secure</span></div>
-                  <div className="text-xs text-slate-500 mt-1">Beta Build v0.9.4</div>
+                  <div className="text-xs text-slate-500 mt-1">Beta Build v0.9.6</div>
                 </div>
               </div>
 
