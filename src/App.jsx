@@ -1,4 +1,3 @@
-// OnMark Web - v0.9.8 (Visual Confirmation Banner)
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
@@ -12,7 +11,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore, collection, addDoc, getDocs } from 'firebase/firestore';
 
-const OnMarkWeb = () => {
+const App = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('b2c'); 
   
@@ -233,7 +232,6 @@ const OnMarkWeb = () => {
         setAnalysisStatus('complete');
         
         // 이전 결과와 반대되는 결과를 설정 (Toggle)
-        // clean -> detected -> clean -> detected ...
         const nextResult = lastAnalysisResultRef.current === 'clean' ? 'detected' : 'clean';
         lastAnalysisResultRef.current = nextResult;
         setAnalysisResult(nextResult);
@@ -271,18 +269,9 @@ const OnMarkWeb = () => {
     setTimeout(() => setToast({ ...toast, show: false }), 3000);
   };
 
-  const handleNotReady = (featureName) => {
-    showToast(`'${featureName}' 기능은 베타 기간 중 준비 중입니다.`, 'info');
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
       
-      {/* 🔴 DEBUG BANNER (버전 확인용 - v0.9.8) */}
-      <div className="bg-yellow-500 text-black text-center py-3 font-bold text-lg fixed top-0 left-0 w-full z-[9999] animate-pulse shadow-xl border-b-4 border-yellow-700">
-        🚧 [확인용 배너] v0.9.8 업데이트 적용됨 (이게 보여야 최신입니다!) 🚧
-      </div>
-
       {/* Toast Notification */}
       <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[110] transition-all duration-300 ${toast.show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
         <div className="bg-slate-800/90 backdrop-blur border border-slate-700 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 whitespace-nowrap">
@@ -370,11 +359,11 @@ const OnMarkWeb = () => {
         </div>
       )}
 
-      {/* Top Banner (Margin added to avoid overlap with debug banner) */}
-      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-xs md:text-sm py-2 px-4 text-center text-blue-100 font-medium z-50 relative mt-14">
+      {/* Top Banner (Updated for V1.0) */}
+      <div className="bg-gradient-to-r from-blue-900 to-indigo-900 text-xs md:text-sm py-2 px-4 text-center text-blue-100 font-medium z-50 relative">
         <span className="inline-flex items-center gap-2">
-          <Activity size={14} className="animate-pulse text-blue-400" />
-          현재 <span className="font-bold text-white">Open Beta v0.9</span> 테스트 중입니다. 여러분의 소중한 피드백이 더 안전한 세상을 만듭니다.
+          <Activity size={14} className="text-green-400" />
+          현재 <span className="font-bold text-white">Official Launch v1.0</span> 정식 서비스 중입니다.
         </span>
       </div>
 
@@ -385,7 +374,8 @@ const OnMarkWeb = () => {
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <Shield className="text-blue-500 fill-blue-500/20" size={28} />
               <span className="text-xl font-bold tracking-tight">OnMark</span>
-              <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded border border-blue-500/30 ml-1">BETA</span>
+              {/* Updated Badge */}
+              <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30 ml-1">v1.0</span>
             </div>
             <div className="hidden md:flex space-x-8 items-center text-sm font-medium text-slate-300">
               <a href="#problem" className="hover:text-white transition-colors">문제 정의</a>
@@ -394,7 +384,7 @@ const OnMarkWeb = () => {
                 <Siren size={14} /> 경찰청 연계 테스트
               </a>
               <a href="#business" className="hover:text-white transition-colors">서비스 모델</a>
-              <button onClick={handleOpenUploadModal} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-900/20 text-sm font-semibold">베타 참여하기</button>
+              <button onClick={handleOpenUploadModal} className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg transition-all shadow-lg shadow-blue-900/20 text-sm font-semibold">지금 시작하기</button>
             </div>
             <div className="md:hidden">
               <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-300 hover:text-white">
@@ -409,7 +399,7 @@ const OnMarkWeb = () => {
             <a href="#technology" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-white">핵심 기술</a>
             <a href="#police-test" onClick={() => setIsMenuOpen(false)} className="block text-blue-300 font-medium">경찰청 연계 테스트</a>
             <a href="#business" onClick={() => setIsMenuOpen(false)} className="block text-slate-300 hover:text-white">서비스 모델</a>
-            <button onClick={() => { handleOpenUploadModal(); setIsMenuOpen(false); }} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">베타 참여하기</button>
+            <button onClick={() => { handleOpenUploadModal(); setIsMenuOpen(false); }} className="w-full bg-blue-600 text-white py-2 rounded-lg font-medium">지금 시작하기</button>
           </div>
         )}
       </nav>
@@ -421,12 +411,12 @@ const OnMarkWeb = () => {
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl"></div>
         </div>
         <div className="max-w-5xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-blue-400 text-xs font-semibold mb-6 animate-fade-in-up">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-900 border border-slate-700 text-green-400 text-xs font-semibold mb-6 animate-fade-in-up">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
             </span>
-            Live Demo Available
+            Official Service Live
           </div>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-tight">
             딥페이크 성범죄,<br />
@@ -436,7 +426,7 @@ const OnMarkWeb = () => {
           </h1>
           <p className="text-slate-400 text-lg md:text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
             OnMark는 안면 인식 기반의 비가시성 워터마킹 기술로 당신의 일상을 지킵니다.
-            현재 경찰청 수사 연계 기능을 포함한 오픈 베타 테스트를 진행 중입니다.
+            이제 정식 서비스를 통해 더 안전한 디지털 환경을 경험하세요.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <button onClick={handleOpenUploadModal} className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2">
@@ -445,7 +435,7 @@ const OnMarkWeb = () => {
             </button>
             <button onClick={() => document.getElementById('police-test').scrollIntoView({ behavior: 'smooth' })} className="w-full sm:w-auto px-8 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-semibold transition-all flex items-center justify-center gap-2">
               <Activity size={18} />
-              테스트 현황 보기
+              연계 시스템 보기
             </button>
           </div>
         </div>
@@ -593,7 +583,7 @@ const OnMarkWeb = () => {
             <h2 className="text-3xl font-bold mb-4">경찰청 수사 연계 솔루션</h2>
             <p className="text-slate-400 max-w-2xl mx-auto">
               단순한 예방을 넘어, 범죄 발생 시 유포자를 신속하게 추적할 수 있는
-              <br className="hidden md:block" /> 수사 기관용 대시보드(Forensic Dashboard)를 함께 테스트하고 있습니다.
+              <br className="hidden md:block" /> 수사 기관용 대시보드(Forensic Dashboard)를 함께 제공하고 있습니다.
             </p>
           </div>
 
@@ -615,7 +605,7 @@ const OnMarkWeb = () => {
                 </div>
                 <div className="mt-auto pt-8 border-t border-slate-800 mt-32">
                   <div className="text-xs text-slate-500">System Status: <span className="text-green-500">Secure</span></div>
-                  <div className="text-xs text-slate-500 mt-1">Beta Build v0.9.6</div>
+                  <div className="text-xs text-slate-500 mt-1">Official Build v1.0.0</div>
                 </div>
               </div>
 
@@ -658,25 +648,25 @@ const OnMarkWeb = () => {
                       )}
                     </div>
                     <div>
-                       <div className="text-sm text-slate-400">
-                         Target: {forensicImage ? (forensicFileName.length > 20 ? forensicFileName.slice(0,20)+'...' : forensicFileName) : '파일을 업로드하세요'}
-                       </div>
-                       <div className="font-mono text-blue-400 text-sm mt-1">
-                         {analysisStatus === 'idle' ? 'Status: Waiting for input' : 
-                          analysisStatus === 'analyzing' ? 'Status: Decrypting Watermark...' : 
-                          'Key: 7BxE93pYfQaRwMtZ2...'}
-                       </div>
+                        <div className="text-sm text-slate-400">
+                          Target: {forensicImage ? (forensicFileName.length > 20 ? forensicFileName.slice(0,20)+'...' : forensicFileName) : '파일을 업로드하세요'}
+                        </div>
+                        <div className="font-mono text-blue-400 text-sm mt-1">
+                          {analysisStatus === 'idle' ? 'Status: Waiting for input' : 
+                           analysisStatus === 'analyzing' ? 'Status: Decrypting Watermark...' : 
+                           'Key: 7BxE93pYfQaRwMtZ2...'}
+                        </div>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                     <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                        <div className={`h-full bg-blue-500 transition-all ease-out duration-[3000ms] ${analysisStatus === 'analyzing' ? 'w-[85%]' : analysisStatus === 'complete' ? 'w-[100%]' : 'w-[0%]'}`}></div>
-                     </div>
-                     <div className="flex justify-between text-xs text-slate-400">
-                        <span>워터마크 복구율: {analysisStatus === 'complete' ? (analysisResult === 'detected' ? '20.4% (훼손됨)' : '99.8%') : analysisStatus === 'analyzing' ? '계산 중...' : '대기 중'}</span>
-                        <span>{analysisStatus === 'complete' ? '분석 완료' : analysisStatus === 'analyzing' ? '추적 중...' : '분석 대기'}</span>
-                     </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                         <div className={`h-full bg-blue-500 transition-all ease-out duration-[3000ms] ${analysisStatus === 'analyzing' ? 'w-[85%]' : analysisStatus === 'complete' ? 'w-[100%]' : 'w-[0%]'}`}></div>
+                      </div>
+                      <div className="flex justify-between text-xs text-slate-400">
+                         <span>워터마크 복구율: {analysisStatus === 'complete' ? (analysisResult === 'detected' ? '20.4% (훼손됨)' : '99.8%') : analysisStatus === 'analyzing' ? '계산 중...' : '대기 중'}</span>
+                         <span>{analysisStatus === 'complete' ? '분석 완료' : analysisStatus === 'analyzing' ? '추적 중...' : '분석 대기'}</span>
+                      </div>
                   </div>
                 </div>
 
@@ -694,33 +684,33 @@ const OnMarkWeb = () => {
                           ? (analysisResult === 'detected' ? 'border-red-500/50 bg-red-500/10' : 'border-green-500/50 bg-green-500/10')
                           : 'border-slate-800'
                   }`}>
-                     <div className="text-xs text-slate-500 mb-1">위변조 여부</div>
-                     <div className={`font-bold flex items-center gap-2 ${
-                         analysisStatus === 'complete' 
+                      <div className="text-xs text-slate-500 mb-1">위변조 여부</div>
+                      <div className={`font-bold flex items-center gap-2 ${
+                          analysisStatus === 'complete' 
                              ? (analysisResult === 'detected' ? 'text-red-400' : 'text-green-400')
                              : analysisStatus === 'analyzing' ? 'text-blue-400 animate-pulse' : 'text-slate-500'
-                     }`}>
-                       {analysisStatus === 'complete' ? (
-                           analysisResult === 'detected' ? (
+                      }`}>
+                        {analysisStatus === 'complete' ? (
+                            analysisResult === 'detected' ? (
                                <>
                                    <AlertTriangle size={16} />
                                    탐지됨 (Face Swap)
                                </>
-                           ) : (
+                            ) : (
                                <>
                                    <CheckCircle size={16} />
                                    정상 (Authentic)
                                </>
-                           )
-                       ) : analysisStatus === 'analyzing' ? (
-                         <>
-                           <Loader2 size={16} className="animate-spin" />
-                           정밀 분석 중...
-                         </>
-                       ) : (
-                         '분석 대기'
-                       )}
-                     </div>
+                            )
+                        ) : analysisStatus === 'analyzing' ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            정밀 분석 중...
+                          </>
+                        ) : (
+                          '분석 대기'
+                        )}
+                      </div>
                   </div>
                 </div>
               </div>
@@ -759,48 +749,48 @@ const OnMarkWeb = () => {
          </div>
       </section>
 
-      {/* Beta Feedback Form (Integrated with Firestore) */}
+      {/* Feedback Form (Integrated with Firestore) */}
       <section className="py-20 px-4 max-w-3xl mx-auto text-center">
         <h2 className="text-3xl font-bold mb-4">여러분의 의견을 들려주세요</h2>
-        <p className="text-slate-400 mb-8">OnMark는 현재 베타 테스트 단계입니다. <br/>서비스 개선을 위해 사용자 여러분의 피드백을 적극 반영하고 있습니다.</p>
+        <p className="text-slate-400 mb-8">OnMark는 사용자 여러분의 피드백을 통해 계속 발전하고 있습니다. <br/>서비스 이용 중 불편한 점이나 제안 사항을 남겨주세요.</p>
         <form onSubmit={handleFeedbackSubmit} className="bg-slate-900 p-8 rounded-2xl border border-slate-800 shadow-xl">
            <div className="flex flex-col gap-4 text-left">
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">어떤 점이 개선되면 좋을까요?</label>
-                <textarea 
-                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32 resize-none placeholder-slate-600" 
-                  placeholder="예: 인스타그램 업로드 시 화질 저하가 궁금합니다. / 앱 사용이 조금 더 간편했으면 좋겠어요." 
-                  value={feedbackMessage} 
-                  onChange={(e) => setFeedbackMessage(e.target.value)}
-                  disabled={isSubmitting}
-                ></textarea>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="flex-1 w-full">
-                   <label className="block text-sm font-medium text-slate-300 mb-2">이메일 (선택)</label>
-                   <input 
-                    type="email" 
-                    value={feedbackEmail} 
-                    onChange={(e) => setFeedbackEmail(e.target.value)} 
-                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600" 
-                    placeholder="contact@email.com" 
-                    disabled={isSubmitting}
-                   />
-                </div>
-                <button 
-                  type="submit" 
-                  className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${feedbackSent ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'} ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : feedbackSent ? <CheckCircle size={20} /> : <Send size={20} />}
-                  {isSubmitting ? '전송 중...' : feedbackSent ? '전송 완료' : '피드백 보내기'}
-                </button>
-              </div>
+             <div>
+               <label className="block text-sm font-medium text-slate-300 mb-2">어떤 점이 개선되면 좋을까요?</label>
+               <textarea 
+                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all h-32 resize-none placeholder-slate-600" 
+                 placeholder="예: 인스타그램 업로드 시 화질 저하가 궁금합니다. / 앱 사용이 조금 더 간편했으면 좋겠어요." 
+                 value={feedbackMessage} 
+                 onChange={(e) => setFeedbackMessage(e.target.value)}
+                 disabled={isSubmitting}
+               ></textarea>
+             </div>
+             <div className="flex flex-col sm:flex-row gap-4 items-end">
+               <div className="flex-1 w-full">
+                  <label className="block text-sm font-medium text-slate-300 mb-2">이메일 (선택)</label>
+                  <input 
+                   type="email" 
+                   value={feedbackEmail} 
+                   onChange={(e) => setFeedbackEmail(e.target.value)} 
+                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600" 
+                   placeholder="contact@email.com" 
+                   disabled={isSubmitting}
+                  />
+               </div>
+               <button 
+                 type="submit" 
+                 className={`px-6 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all ${feedbackSent ? 'bg-green-600 text-white' : 'bg-blue-600 hover:bg-blue-500 text-white'} ${isSubmitting ? 'opacity-50 cursor-wait' : ''}`}
+                 disabled={isSubmitting}
+               >
+                 {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : feedbackSent ? <CheckCircle size={20} /> : <Send size={20} />}
+                 {isSubmitting ? '전송 중...' : feedbackSent ? '전송 완료' : '피드백 보내기'}
+               </button>
+             </div>
            </div>
            
            {/* Admin Download Link */}
            <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-800">
-             <p className="text-xs text-slate-500">* 보내주신 의견은 OnMark 서비스 고도화 및 심사 발표 자료 보완에 소중히 사용됩니다.</p>
+             <p className="text-xs text-slate-500">* 보내주신 의견은 OnMark 서비스 고도화에 소중히 사용됩니다.</p>
              <button 
                type="button"
                onClick={handleDownloadCSV}
@@ -823,4 +813,4 @@ const OnMarkWeb = () => {
   );
 };
 
-export default OnMarkWeb;
+export default App;
