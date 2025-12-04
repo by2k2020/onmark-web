@@ -1,11 +1,11 @@
-// [Vercel Trigger] FINAL TRIGGER - Timestamp: 2024.12.05 (Re-push)
+// [Vercel Trigger] FIXED: Add CSV Download & Demo Mode - Timestamp: 2024.12.05
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Shield, Eye, Lock, Activity, Users, FileSearch, Send, CheckCircle, 
   AlertTriangle, ChevronRight, Menu, X, Smartphone, Siren, 
   Database, Server, Fingerprint, Award, TrendingUp, Info,
   Upload, Image as ImageIcon, Download, Loader2, Check, Scan, Zap, FileText,
-  Wrench // 디버그용 아이콘 추가
+  Wrench // 디버그용 아이콘
 } from 'lucide-react';
 
 // Firebase SDK Imports
@@ -51,36 +51,56 @@ const App = () => {
   // 기능 6: 스크롤 애니메이션
   const [isVisible, setIsVisible] = useState({});
 
-  // Firebase State
+  // Firebase & Demo State
   const [user, setUser] = useState(null);
   const [db, setDb] = useState(null);
   const [appId, setAppId] = useState(null);
+  const [isDemoMode, setIsDemoMode] = useState(false); // 데모 모드 상태
 
   // --- Firebase Initialization & Auth ---
   useEffect(() => {
-    const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+    // Vercel 환경에서는 __firebase_config가 없을 수 있음
+    const firebaseConfigStr = typeof __firebase_config !== 'undefined' ? __firebase_config : '{}';
     const currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
     setAppId(currentAppId);
 
+    const firebaseConfig = JSON.parse(firebaseConfigStr);
+
     if (firebaseConfig.apiKey) {
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const firestore = getFirestore(app);
-        setDb(firestore);
+        // [Real Mode] 실제 키가 있을 때
+        try {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const firestore = getFirestore(app);
+            setDb(firestore);
 
-        const initAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                await signInWithCustomToken(auth, __initial_auth_token);
-            } else {
-                await signInAnonymously(auth);
-            }
-        };
-        initAuth();
+            const initAuth = async () => {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            };
+            initAuth();
 
-        const unsubscribe = onAuthStateChanged(auth, setUser);
-        return () => unsubscribe();
+            const unsubscribe = onAuthStateChanged(auth, setUser);
+            return () => unsubscribe();
+        } catch (e) {
+            console.error("Firebase Init Error:", e);
+            activateDemoMode(); // 초기화 실패 시 데모 모드
+        }
+    } else {
+        // [Demo Mode] 키가 없으면 데모 모드 활성화 (Vercel 배포 시 여기로 옴)
+        console.log("No Firebase config found. Activating Demo Mode.");
+        activateDemoMode();
     }
   }, []);
+
+  const activateDemoMode = () => {
+      setIsDemoMode(true);
+      // 가짜 로그인 처리
+      setUser({ uid: 'demo-user-123', isAnonymous: true, email: 'demo@onmark.com' });
+  };
 
   // --- Scroll Observer ---
   useEffect(() => {
@@ -134,7 +154,7 @@ const App = () => {
     };
   }, [isResizing]);
 
-  // --- Feedback Submit Handler ---
+  // --- Feedback Submit Handler (데모 모드 지원) ---
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
     if(feedbackMessage.trim().length === 0) {
@@ -142,23 +162,32 @@ const App = () => {
       return;
     }
 
-    if (!db || !user) {
-        showToast('서버 연결 중입니다. 잠시 후 다시 시도해주세요.', 'warning');
+    if (!user) {
+        showToast('사용자 인증 중입니다. 잠시만 기다려주세요.', 'warning');
         return;
     }
 
     setIsSubmitting(true);
 
     try {
-        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
-            message: feedbackMessage,
-            email: feedbackEmail || 'anonymous',
-            timestamp: new Date().toISOString(),
-            userId: user.uid
-        });
-
-        setFeedbackSent(true);
-        showToast('소중한 의견이 서버에 안전하게 저장되었습니다.', 'success');
+        if (isDemoMode) {
+            // [Demo Mode] 서버 없이 성공 처리 시뮬레이션
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            setFeedbackSent(true);
+            showToast('소중한 의견이 전달되었습니다. (Demo Mode)', 'success');
+        } else if (db) {
+            // [Real Mode]
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'), {
+                message: feedbackMessage,
+                email: feedbackEmail || 'anonymous',
+                timestamp: new Date().toISOString(),
+                userId: user.uid
+            });
+            setFeedbackSent(true);
+            showToast('소중한 의견이 서버에 안전하게 저장되었습니다.', 'success');
+        } else {
+            throw new Error("DB connection failed");
+        }
         
         setTimeout(() => {
             setFeedbackSent(false);
@@ -167,16 +196,42 @@ const App = () => {
         }, 3000);
     } catch (error) {
         console.error("Error adding document: ", error);
-        showToast('전송 중 오류가 발생했습니다.', 'error');
+        // 에러 발생 시 데모 모드로 전환 제안
+        if (!isDemoMode) {
+            showToast('전송 실패. 데모 모드로 전환합니다.', 'warning');
+            activateDemoMode();
+        } else {
+            showToast('전송 중 오류가 발생했습니다.', 'error');
+        }
     } finally {
         setIsSubmitting(false);
     }
   };
 
-  // --- Download Feedback as CSV ---
+  // --- Download Feedback as CSV (데모 모드 지원) ---
   const handleDownloadCSV = async () => {
-      if (!db || !user) {
-          showToast('데이터를 불러올 권한이 없습니다.', 'error');
+      if (!user) {
+          showToast('권한 확인 중입니다.', 'error');
+          return;
+      }
+
+      // [Demo Mode] 가상 데이터 다운로드
+      if (isDemoMode) {
+          showToast('Demo Mode: 시연용 데이터를 다운로드합니다.', 'info');
+          const mockData = [
+              { timestamp: new Date().toISOString(), email: 'demo@onmark.com', message: '이것은 시연용 샘플 데이터입니다.' },
+              { timestamp: new Date(Date.now() - 3600000).toISOString(), email: 'tester@test.com', message: 'CSV 다운로드 기능 테스트 중입니다.' },
+              { timestamp: new Date(Date.now() - 86400000).toISOString(), email: 'user@example.com', message: '사진 업로드 속도가 매우 빠르네요. 좋습니다.' },
+              { timestamp: new Date(Date.now() - 172800000).toISOString(), email: 'police@korea.kr', message: '수사 연계 대시보드 기능 제안합니다.' }
+          ];
+          downloadCSV(mockData);
+          return;
+      }
+
+      // [Real Mode]
+      if (!db) {
+          showToast('서버에 연결할 수 없습니다. (데모 모드 활성화됨)', 'warning');
+          activateDemoMode();
           return;
       }
 
@@ -184,38 +239,49 @@ const App = () => {
           showToast('데이터를 불러오는 중...', 'info');
           const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'feedback'));
           
-          let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
-          csvContent += "날짜,이메일,내용\n"; 
-
           const data = [];
           querySnapshot.forEach((doc) => {
               const d = doc.data();
               data.push(d);
           });
-
-          data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-
-          data.forEach(row => {
-              const date = new Date(row.timestamp).toLocaleString();
-              const safeMessage = `"${(row.message || '').replace(/"/g, '""')}"`;
-              const safeEmail = `"${(row.email || '').replace(/"/g, '""')}"`;
-              csvContent += `${date},${safeEmail},${safeMessage}\n`;
-          });
-
-          const encodedUri = encodeURI(csvContent);
-          const link = document.createElement("a");
-          link.setAttribute("href", encodedUri);
-          link.setAttribute("download", "OnMark_Feedback_Data.csv");
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-
-          showToast('피드백 데이터 다운로드가 완료되었습니다.', 'success');
+          
+          if (data.length === 0) {
+              showToast('저장된 데이터가 없습니다.', 'info');
+              return;
+          }
+          downloadCSV(data);
 
       } catch (error) {
           console.error("Error downloading CSV:", error);
-          showToast('데이터 다운로드 실패', 'error');
+          showToast('데이터 다운로드 실패. 데모 모드로 전환합니다.', 'error');
+          activateDemoMode();
       }
+  };
+
+  // CSV 생성 및 다운로드 함수
+  const downloadCSV = (data) => {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+      csvContent += "날짜,이메일,내용\n"; 
+
+      data.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+      data.forEach(row => {
+          const date = new Date(row.timestamp).toLocaleString();
+          // CSV 깨짐 방지를 위해 따옴표 처리
+          const safeMessage = `"${(row.message || '').replace(/"/g, '""')}"`;
+          const safeEmail = `"${(row.email || '').replace(/"/g, '""')}"`;
+          csvContent += `${date},${safeEmail},${safeMessage}\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `OnMark_Feedback_Data${isDemoMode ? '_Demo' : ''}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      showToast('피드백 데이터 다운로드가 완료되었습니다.', 'success');
   };
 
   // --- Forensic File Select (Updated: Toggle Logic) ---
@@ -274,10 +340,14 @@ const App = () => {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 font-sans selection:bg-blue-500 selection:text-white overflow-x-hidden relative">
       
-      {/* 🔴 [DEBUG MODE BANNER] - 배포 확인용 강제 배너 */}
-      <div className="bg-red-600 text-white font-bold text-center py-4 px-4 sticky top-0 z-[9999] shadow-xl flex items-center justify-center gap-2 animate-pulse border-b-4 border-red-800">
+      {/* 🔴 [DEPLOYMENT CHECK BANNER] - 데모 모드 상태 표시 */}
+      <div className={`text-white font-bold text-center py-4 px-4 sticky top-0 z-[9999] shadow-xl flex items-center justify-center gap-2 animate-pulse border-b-4 ${isDemoMode ? 'bg-indigo-600 border-indigo-800' : 'bg-red-600 border-red-800'}`}>
          <Wrench size={24} />
-         <span>[DEPLOYMENT CHECK] 이 배너가 보이면 v1.0 코드가 정상적으로 배포된 것입니다.</span>
+         <span>
+            {isDemoMode 
+             ? "[OFFICIAL RELEASE v1.0] Demo Mode Active: 서버 연결 없이 모든 기능 시연이 가능합니다."
+             : "[DEPLOYMENT CHECK] 이 배너가 보이면 v1.0 코드가 정상적으로 배포된 것입니다."}
+         </span>
       </div>
 
       {/* Toast Notification */}
@@ -382,8 +452,8 @@ const App = () => {
             <div className="flex items-center gap-2 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
               <Shield className="text-blue-500 fill-blue-500/20" size={28} />
               <span className="text-xl font-bold tracking-tight">OnMark</span>
-              {/* Updated Badge to DEBUG for verification */}
-              <span className="text-[10px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 ml-1">v1.0 (DEBUG)</span>
+              {/* Updated Badge to v1.0 */}
+              <span className="text-[10px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded border border-green-500/30 ml-1">v1.0</span>
             </div>
             <div className="hidden md:flex space-x-8 items-center text-sm font-medium text-slate-300">
               <a href="#problem" className="hover:text-white transition-colors">문제 정의</a>
