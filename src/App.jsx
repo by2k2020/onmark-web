@@ -15,10 +15,11 @@ const OnMarkWeb = () => {
   const [feedbackMessage, setFeedbackMessage] = useState(''); 
   const [feedbackSent, setFeedbackSent] = useState(false);
 
-  // 기능 2: 경찰청 대시보드 시뮬레이션 상태 (업그레이드: 랜덤 분석 결과)
+  // 기능 2: 경찰청 대시보드 시뮬레이션 상태
   const [analysisStatus, setAnalysisStatus] = useState('idle'); // idle, analyzing, complete
   const [analysisResult, setAnalysisResult] = useState(null); // 'detected' (위변조) or 'clean' (정상)
   const [forensicImage, setForensicImage] = useState(null); // 분석할 이미지
+  const [forensicFileName, setForensicFileName] = useState(''); // 파일명 저장
   const forensicFileInputRef = useRef(null);
   
   // 기능 3: 팝업 메시지 (Toast)
@@ -106,27 +107,33 @@ const OnMarkWeb = () => {
     }
   };
 
-  // 경찰청 분석 파일 선택 핸들러 (수정: 랜덤 결과 시뮬레이션)
+  // 경찰청 분석 파일 선택 핸들러 (수정: 파일명 기반 결정적 로직 구현)
   const handleForensicFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
       const imageUrl = URL.createObjectURL(file);
       setForensicImage(imageUrl);
+      setForensicFileName(file.name);
       setAnalysisStatus('analyzing');
       setAnalysisResult(null); // 결과 초기화
-      showToast('증거물이 업로드되었습니다. AI 정밀 분석을 시작합니다.', 'info');
+      showToast(`'${file.name}' 업로드 완료. AI 정밀 분석을 시작합니다.`, 'info');
+
+      // 결정적 로직: 파일명에 특정 키워드가 포함되어 있는지 확인
+      const fileNameLower = file.name.toLowerCase();
+      const detectedKeywords = ['fake', 'deepfake', 'edit', 'manipul', '가짜', '위변조', 'copy', 'faked'];
+      
+      // 키워드가 포함되면 '위변조(detected)', 아니면 '정상(clean)'
+      const isForged = detectedKeywords.some(keyword => fileNameLower.includes(keyword));
 
       // 분석 시뮬레이션 (3초 후 결과 도출)
       setTimeout(() => {
         setAnalysisStatus('complete');
-        // 50% 확률로 정상/위변조 결정
-        const isForged = Math.random() > 0.5;
         setAnalysisResult(isForged ? 'detected' : 'clean');
 
         if (isForged) {
-          showToast('분석 완료: 위변조 흔적 및 워터마크 훼손이 검출되었습니다.', 'warning');
+          showToast(`분석 완료: '${file.name}'에서 치명적 위변조 흔적이 검출되었습니다.`, 'warning');
         } else {
-          showToast('분석 완료: 위변조 흔적이 없는 정상 이미지입니다.', 'success');
+          showToast(`분석 완료: '${file.name}'은(는) 위변조되지 않은 원본입니다.`, 'success');
         }
       }, 3000);
     }
@@ -540,7 +547,9 @@ const OnMarkWeb = () => {
                       )}
                     </div>
                     <div>
-                       <div className="text-sm text-slate-400">Target ID: {forensicImage ? '#ANALYSIS-REQ-2024' : '파일을 업로드하세요'}</div>
+                       <div className="text-sm text-slate-400">
+                         Target: {forensicImage ? (forensicFileName.length > 20 ? forensicFileName.slice(0,20)+'...' : forensicFileName) : '파일을 업로드하세요'}
+                       </div>
                        <div className="font-mono text-blue-400 text-sm mt-1">
                          {analysisStatus === 'idle' ? 'Status: Waiting for input' : 
                           analysisStatus === 'analyzing' ? 'Status: Decrypting Watermark...' : 
